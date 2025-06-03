@@ -56,8 +56,11 @@ splits = {
 train_df = pd.read_parquet(splits["train"])
 test_df = pd.read_parquet(splits["test"])
 eval_df = pd.read_parquet(splits["eval"])
-
 num_classes = train_df["label"].nunique()
+
+print("Train set class distribution:\n", train_df["label"].value_counts())
+print("Test set class distribution:\n", test_df["label"].value_counts())
+print("Eval set class distribution:\n", eval_df["label"].value_counts())
 
 print(f"Detected {num_classes} classes.")
 
@@ -195,11 +198,11 @@ for epoch in range(EPOCHS):
         images, labels = images.to(device), labels.to(device)
 
         # === BACKPROP + GRADIENT DESCENT ===
-        optimizer.zero_grad()  # 🔥 Zero previous gradients
+        optimizer.zero_grad()  #  Zero previous gradients
         outputs = model(images)  # Forward pass
         loss = criterion(outputs, labels)  # Compute loss
-        loss.backward()  # 🔥 Backpropagation: compute gradients
-        optimizer.step()  # 🔥 Gradient Descent: update weights
+        loss.backward()  #  Backpropagation: compute gradients
+        optimizer.step()  #  Gradient Descent: update weights
         # ====================================
 
         running_loss += loss.item()
@@ -257,3 +260,23 @@ torch.save(
 print("Model saved as checkpoint.pth")
 
 # %%
+
+# Predict from an image
+
+
+def predict_image(image_path, model, transform, class_names=None, device=device):
+    model.eval()
+    img = Image.open(image_path).convert("RGB")
+    img_t = transform(img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        outputs = model(img_t)
+        _, predicted = torch.max(outputs, 1)
+    pred_idx = predicted.item()
+    if class_names:
+        return class_names[pred_idx]
+    return pred_idx
+
+
+# Example usage:
+# pred = predict_image("path/to/image.jpg", model, transform)
+# print("Predicted class:", pred)
