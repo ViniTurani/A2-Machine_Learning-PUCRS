@@ -5,5 +5,6 @@ torch
 torchvision
 Pillow
 tqdm
-uvicorn
-fastapi
+# demo extra requirements
+opencv-python 
+pillow 
