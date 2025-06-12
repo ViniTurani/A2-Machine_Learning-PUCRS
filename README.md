@@ -76,3 +76,15 @@ Pós-processamento
 - **Treino:** Adam (LR = 1e-3) + `StepLR` (γ = 0.1 a cada 3 épocas), `CrossEntropyLoss`, 10 épocas padrão, *checkpoint* em `checkpoint.pth`.  
 - **Avaliação:** acurácia em *test set* + matriz de confusão normalizada (salva em `apresentacao/confusion_matrix.png`).  
 - **Extras:** *forward hook* salva *feature maps* do último bloco conv; script imprime média/σ do dataset e, opcionalmente, das capturas de webcam para análise de domínio.
+
+
+## Stack:
+- **PyTorch / TorchVision** – backbone de deep learning: define a CNN (nn.Module), executa o treinamento/inferência no CPU ou GPU e fornece utilitários de transformação base (transforms).
+- **Albumentations (+ ToTensorV2)** – motor de data-augmentation avançado; aplica rotações, affine, ruído, blur, etc., devolvendo tensores diretamente compatíveis com PyTorch.
+- **OpenCV** – captura de vídeo em tempo real, aplicação de digital zoom e overlay de resultados na janela da webcam.
+- **Pillow (PIL)** – leitura de bytes de imagem → objetos RGB manipuláveis.
+- **NumPy** – operações numéricas rápidas (ex.: conversão de imagens para arrays, cálculo de médias/desvios).
+- **Pandas** – leitura dos splits Parquet hospedados no Hugging Face Hub e manipulação tabular dos metadados.
+- **Matplotlib** – geração de gráficos: curvas de perda/acurácia, matriz de confusão e visualização de feature maps.
+- **tqdm** – barras de progresso elegantes durante o treinamento.
+- **Albumentations + Hugging Face hub links** – combinados para carregar dados e aplicar o pipeline de preprocessamento em tempo real.
