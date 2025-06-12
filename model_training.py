@@ -17,6 +17,9 @@ from tools import (
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from tqdm import tqdm
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 
 SEED = 42
 BATCH_SIZE = 32
@@ -43,46 +46,49 @@ def add_gaussian_noise(std: float = 0.05):
     return transforms.Lambda(lambda x: x + torch.randn_like(x) * std)
 
 
-transform_train = transforms.Compose(
+_base_aug = A.Compose(
     [
-        # 1) Geometric distortions (operate on PIL images)
-        transforms.RandomApply([transforms.RandomRotation(45)], p=0.5),
-        transforms.RandomApply(
-            [transforms.RandomAffine(0, translate=(0.10, 0.10))], p=0.5
+        A.Rotate(limit=30, p=0.5),
+        A.RandomScale(scale_limit=0.2, p=0.5),
+        A.ShiftScaleRotate(shift_limit=0.1, rotate_limit=0, scale_limit=0, p=0.5),
+        A.HorizontalFlip(p=0.5),
+        # Occlusion & blur
+        A.CoarseDropout(
+            max_holes=1, max_height=20, max_width=20, fill_value=128, p=0.5
         ),
-        transforms.RandomApply([transforms.RandomAffine(0, scale=(0.9, 1.1))], p=0.5),
-        transforms.RandomApply(
+        A.Blur(blur_limit=3, p=0.3),
+        # Cor & brilho
+        A.OneOf(
             [
-                transforms.RandomAffine(
-                    0,
-                    shear=15,
-                    interpolation=transforms.InterpolationMode.BILINEAR,
-                    fill=128,
-                )
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.2, contrast_limit=0.2, p=0.7
+                ),
+                A.HueSaturationValue(
+                    hue_shift_limit=15, sat_shift_limit=25, val_shift_limit=15, p=0.7
+                ),
+                A.ChannelShuffle(p=0.3),
             ],
             p=0.8,
         ),
-        # random horizontal/vertical flips
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomVerticalFlip(p=0.3),
-        # photometric distortions (still on PIL images)
-        transforms.RandomApply(
-            [
-                transforms.ColorJitter(
-                    brightness=0.3, contrast=0.3, saturation=0.3, hue=0.04  # ±30 %
-                )
-            ]
-        ),
-        # convert to tensor
-        transforms.Resize((64, 64)),
-        transforms.ToTensor(),
-        # tensor-space augmentations
-        transforms.RandomApply([add_gaussian_noise(std=0.05)], p=0.5),
-        transforms.RandomErasing(p=0.25, scale=(0.02, 0.10)),
-        # normalisation
-        transforms.Normalize([0.5] * 3, [0.5] * 3),
+        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+        # Resize → Normaliza → Tensor
+        A.Resize(64, 64),
+        A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        ToTensorV2(),
     ]
 )
+
+
+# 2) wrapper que permite chamar transform(img) dentro do Dataset
+def transform_train(img):
+    """
+    Converte PIL→ndarray (se necessário), aplica Albumentations
+    e devolve um torch.Tensor CxHxW.
+    """
+    if not isinstance(img, np.ndarray):
+        img = np.array(img)
+    return _base_aug(image=img)["image"]
+
 
 # Validation / test use the deterministic pipeline only
 transform_eval = transforms.Compose(
@@ -135,8 +141,9 @@ class GenderDataset(Dataset):
 
 # %%
 # Dataloaders
+
 train_loader = DataLoader(
-    GenderDataset(train_df, transform=transform_train),
+    GenderDataset(train_df, transform=transform_train),  #  <- wrapper aqui
     batch_size=BATCH_SIZE,
     shuffle=True,
     num_workers=0,
@@ -157,10 +164,6 @@ eval_loader = DataLoader(
     num_workers=0,
     pin_memory=True,
 )
-
-
-# %%
-# Visualize a mini‑batch (optional)
 
 
 # %%
