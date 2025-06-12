@@ -16,3 +16,5 @@ fastparquet
 huggingface_hub[fsspec]
 fsspec[http]
 aiohttp
+
+albumentations

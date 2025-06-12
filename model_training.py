@@ -1,7 +1,7 @@
 import os
 import pathlib
 from io import BytesIO
-
+from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,13 +9,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
+from tools import (
+    plot_confusion_matrix,
+    save_feature_maps,
+    dataset_mean_std,
+)
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-from torchvision.utils import make_grid
 from tqdm import tqdm
-
-# %%
-# Configs
 
 SEED = 42
 BATCH_SIZE = 32
@@ -59,7 +60,7 @@ transform_train = transforms.Compose(
                     fill=128,
                 )
             ],
-            p=0.5,
+            p=0.8,
         ),
         # random horizontal/vertical flips
         transforms.RandomHorizontalFlip(p=0.5),
@@ -160,19 +161,10 @@ eval_loader = DataLoader(
 
 # %%
 # Visualize a mini‑batch (optional)
-def imshow(img):
-    img = img * 0.5 + 0.5  # unnormalize
-    npimg = img.numpy()
-    plt.figure(figsize=(8, 4))
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.axis("off")
-    plt.show()
 
 
 # %%
 # Model definition
-
-
 class SimpleCNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -197,11 +189,6 @@ class SimpleCNN(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            # #  4×4  ->  2×2
-            # nn.Conv2d(128, 256, 3, padding=1),
-            # nn.BatchNorm2d(256),
-            # nn.ReLU(),
-            # nn.MaxPool2d(2),
         )
 
         self.fc_layers = nn.Sequential(
@@ -219,11 +206,7 @@ class SimpleCNN(nn.Module):
 
 model = SimpleCNN().to(device)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Hooks to capture intermediate feature maps
-# ──────────────────────────────────────────────────────────────────────────────
-from typing import Dict
-
+# -----------------------------------------------------------------------------
 feature_maps: Dict[str, torch.Tensor] = {}
 
 
@@ -234,66 +217,6 @@ def _hook(_, __, output):
 
 # register the hook on the whole conv stack
 hook_handle = model.conv_layers.register_forward_hook(_hook)
-
-
-def save_feature_maps(
-    feat_tensor: torch.Tensor,
-    img_tensor: torch.Tensor,
-    labels: torch.Tensor,
-    tag: str = "train",
-) -> None:
-    """
-    Visualise the *first* occurrence of each class (0 = woman, 1 = man) in a batch.
-
-    • Two columns per row:
-        left  - original RGB image (unnormalised)
-        right - mean-over-channels feature map from the CNN
-
-    • At most one row per class → max 2 rows total.
-    • Writes   feature_maps_<tag>.png   in the working directory.
-
-    Parameters
-    ----------
-    feat_tensor : torch.Tensor  (B, C, H, W)  CNN activations from a forward hook
-    img_tensor  : torch.Tensor  (B, 3, H, W)  input images *after* transform
-    labels      : torch.Tensor  (B,)          integer class labels
-    tag         : str                          identifier used in the filename
-    """
-
-    # indices of the first example of each class
-    idx_0 = (labels == 0).nonzero(as_tuple=True)[0]
-    idx_1 = (labels == 1).nonzero(as_tuple=True)[0]
-    selected = []
-    if len(idx_0) > 0:
-        selected.append(idx_0[0].item())
-    if len(idx_1) > 0:
-        selected.append(idx_1[0].item())
-    if not selected:
-        return  # nothing to plot in this batch
-
-    n_rows = len(selected)
-    fig, axes = plt.subplots(
-        n_rows, 2, figsize=(6, 3 * n_rows), squeeze=False, facecolor="white"
-    )
-
-    for row, idx in enumerate(selected):
-        # ---- Original image (undo normalisation) ----
-        img = img_tensor[idx].cpu() * 0.5 + 0.5  # revert [-1,1] → [0,1]
-        np_img = img.permute(1, 2, 0).clamp(0, 1).numpy()
-        axes[row, 0].imshow(np_img)
-        axes[row, 0].set_title(f"Label {labels[idx].item()} – original")
-        axes[row, 0].axis("off")
-
-        # ---- Feature map (mean over channels) ----
-        feat_img = feat_tensor[idx].mean(0).cpu()  # (H, W)
-        axes[row, 1].imshow(feat_img, cmap="viridis")
-        axes[row, 1].set_title("Feature map")
-        axes[row, 1].axis("off")
-
-    plt.suptitle(f"{tag}: first examples of each class\n(0 = woman, 1 = man)")
-    plt.tight_layout()
-    plt.savefig(f"feature_maps_{tag}.png", facecolor="white", bbox_inches="tight")
-    plt.close(fig)
 
 
 # %%
@@ -316,7 +239,7 @@ scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
 # If we loaded a checkpoint, restore optimizer/scheduler to resume training later
 if LOAD_CHECKPOINT and os.path.exists(CHECKPOINT_PATH):
-    optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+    optimizer.load_state_dict(ckpt["optimizer_state_dict"])  # type: ignore
 
 # %%
 # Training loop (skipped if SKIP_TRAINING is True)
@@ -378,7 +301,7 @@ if not SKIP_TRAINING:
         ax_acc.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig("loss_accuracy.png")
+        plt.savefig("apresentacao/loss_accuracy.png")
         plt.close()
 
     # Save the checkpoint
@@ -408,34 +331,19 @@ with torch.no_grad():
 print(f"Test Accuracy: {100 * correct / total:.2f}%")
 
 
-# %%
-# Prediction helper
-def predict_image(image_path, model, transform, class_names=None, device=device):
-    model.eval()
-    img = Image.open(image_path).convert("RGB")
-    img_t = transform(img).unsqueeze(0).to(device)
-    with torch.no_grad():
-        outputs = model(img_t)
-        probs = torch.softmax(outputs, dim=1)
-        conf, predicted = torch.max(probs, 1)
-    pred_idx = predicted.item()
-    if class_names:
-        return class_names[pred_idx], conf.item()
-    return pred_idx, conf.item()
+# Save confusion matrix on the test set
+plot_confusion_matrix(
+    model,
+    test_loader,
+    class_names=["woman", "man"],
+    device=device,
+    normalize=True,  # row‑wise percentages
+    filename="apresentacao/confusion_matrix.png",
+)
+print("Confusion-matrix saved to apresentacao/confusion_matrix.png")
 
 
 # %%
-def dataset_mean_std(loader):
-    n, mean, M2 = 0, torch.zeros(3), torch.zeros(3)
-    for x, _ in loader:
-        bs = x.size(0)
-        x = x.view(bs, 3, -1)
-        mean += x.mean(2).sum(0)
-        M2 += x.var(2, unbiased=False).sum(0)
-        n += bs
-    mean /= n
-    std = (M2 / n).sqrt()
-    return mean, std
 
 
 # remove hook to free resources
@@ -458,5 +366,5 @@ if __name__ == "__main__":
         del cam_stack
     else:
         print(
-            "\n(no cam_tensors/*.pt found – run camera.py and press SPACE a few times)"
+            "\n(no cam_tensors/*.pt found - run camera.py and press SPACE a few times)"
         )
