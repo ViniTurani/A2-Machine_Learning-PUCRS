@@ -5,6 +5,14 @@ torch
 torchvision
 Pillow
 tqdm
-# demo extra requirements
+scikit-learn
+
 opencv-python 
 pillow 
+
+pyarrow
+fastparquet
+
+huggingface_hub[fsspec]
+fsspec[http]
+aiohttp
