@@ -2,11 +2,9 @@ import random
 from io import BytesIO
 
 import albumentations as A
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from huggingface_hub import hf_hub_download
 from PIL import Image
 
 SEED = 42

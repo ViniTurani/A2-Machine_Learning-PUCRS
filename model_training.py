@@ -232,10 +232,9 @@ if LOAD_CHECKPOINT and os.path.exists(CHECKPOINT_PATH):
     model.eval()
     SKIP_TRAINING = True
 else:
-    print("🛈 No checkpoint found – training from scratch.")
+    print("X No checkpoint found - training from scratch.")
 
 # %%
-# Loss, Optimizer, Scheduler (define regardless so they are available later)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LR)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
@@ -245,7 +244,6 @@ if LOAD_CHECKPOINT and os.path.exists(CHECKPOINT_PATH):
     optimizer.load_state_dict(ckpt["optimizer_state_dict"])  # type: ignore
 
 # %%
-# Training loop (skipped if SKIP_TRAINING is True)
 if not SKIP_TRAINING:
     epoch_losses, epoch_val_acc = [], []
     for epoch in range(EPOCHS):
@@ -347,11 +345,7 @@ print("Confusion-matrix saved to apresentacao/confusion_matrix.png")
 
 
 # %%
-
-
-# remove hook to free resources
 hook_handle.remove()
-
 
 if __name__ == "__main__":
     train_mean, train_std = dataset_mean_std(train_loader)
