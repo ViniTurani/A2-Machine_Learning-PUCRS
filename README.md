@@ -1,90 +1,85 @@
-# Aprendizado de máquina - T2
+# Machine Learning – Assignment 2
 
-Opção escolhida: Visão computacional
+Chosen option: Computer Vision
 
-## Alunos:
-Kristen Karsburg Arguello - 22103087  
-Ramiro Nilson Barros - 22111163  
-Vinícius Conte Turani - 22106859
+## Students:
+Kristen Karsburg Arguello – 22103087  
+Ramiro Nilson Barros – 22111163  
+Vinícius Conte Turani – 22106859
 
-## Como reproduzir os resultados:
-1) Instalar dependências:
+## How to reproduce the results:
+1) Install dependencies:
 ```sh
 pip install -r requirements.txt
 ```
 
-2) Treinar o modelo:
+2) Train the model:
 ```sh
 python3 model_training.py
 ```
-| Isso gera o arquivo checkpoint.pth com os pesos finais
+| This generates the file `checkpoint.pth` containing the final weights.
 
-3) Executar a aplicação de demonstração:
+3) Run the demo application:
 ```sh
 python3 camera.py
 ```
-*Atenção*: na primeira execução o sistema solicitará permissão de acesso à webcam.
-Caso negue ou ainda não tenha concedido, o programa encerrará. Basta conceder o acesso e reexecutar o comando acima.
+*Note*: On the first run, the system will request webcam access permission.  
+If denied or not yet granted, the program will exit. Just allow access and re-run the command above.
 
-4) Usar a demo: 
-- A janela da webcam será exibida.
-- Posicione o rosto da pessoa dentro do quadro e pressione BARRA DE ESPAÇO para capturar o frame.
-- O modelo classificará a imagem como “woman” ou “man” e mostrará o resultado na tela.
-- Para encerrar a aplicação, pressione ESC.
+4) Use the demo: 
+- A webcam window will appear.
+- Position the person's face within the frame and press the SPACEBAR to capture a frame.
+- The model will classify the image as either “woman” or “man” and display the result on the screen.
+- To close the application, press ESC.
 
-### Extras — como reproduzir os gráficos
-1. **Saídas automáticas do treinamento**  
-   Ao treinar o modelo, três arquivos são gerados na pasta `apresentacao`:
-   - `confusion_matrix.png` – matriz de confusão normalizada.  
-   - `loss_accuracy.png` – curvas de perda e acurácia por época.  
-   - `feature_maps_demo.png` – visualização dos *feature maps* das duas primeiras amostras.
-2. **Inspeção das transformações de dados**  
-   Para ver exemplos antes/depois do pipeline de *data augmentation*, execute:  
+### Extras — how to reproduce the graphs
+1. **Training output files**  
+   When training the model, three files are saved in the `apresentacao` folder:
+   - `confusion_matrix.png` – normalized confusion matrix  
+   - `loss_accuracy.png` – loss and accuracy curves per epoch  
+   - `feature_maps_demo.png` – visualization of feature maps for the first two samples  
+   
+2. **Data transformation inspection**  
+   To view before/after examples from the data augmentation pipeline, run:  
    ```bash
    python documenting_dataset.py
    ```
-   
-#### Transformações aplicadas, em ordem:
-Geometria
-• Rotação ±30 ° (50 %)
-• Escala ±20 % (50 %)
-• Shift ±10 % (50 %)
-• Flip horizontal (50 %)
 
-Oclusão e desfoque
-• CoarseDropout (1 furo, 20 × 20 px, valor 128, 50 %)
-• Desfoque gaussiano (3 px, 30 %)
+#### Transformations applied, in order:
+**Geometry**
+- Rotation ±30° (50%)
+- Scaling ±20% (50%)
+- Shift ±10% (50%)
+- Horizontal flip (50%)
 
-Cor e brilho (um dos itens abaixo, 80 % de probabilidade)
-• Brilho/contraste ±20 % (70 %)
-• Hue ±15 °, Saturação ±25 %, Valor ±15 % (70 %)
-• Channel shuffle (30 %)
+**Occlusion and blur**
+- CoarseDropout (1 hole, 20 × 20 px, value 128, 50%)
+- Gaussian blur (3 px, 30%)
 
-Ruído
-• Ruído gaussiano σ² entre 10 e 50 (30 %)
+**Color and brightness** *(one of the following, 80% probability)*
+- Brightness/contrast ±20% (70%)
+- Hue ±15°, Saturation ±25%, Value ±15% (70%)
+- Channel shuffle (30%)
 
-Pós-processamento
-• Redimensionamento para 64 × 64
-• Normalização (média = 0.5, desvio = 0.5)
-• Conversão para tensor (ToTensorV2)
-   
+**Noise**
+- Gaussian noise with σ² between 10 and 50 (30%)
 
-## Visão-geral rápida do projeto
-- **Objetivo:** classificar imagens 64 × 64 em *woman* ou *man* com uma CNN enxuta (~2 M parâmetros).  
-- **Arquitetura (`SimpleCNN`):** 4 blocos `Conv → BN → ReLU → MaxPool`, saindo de 3×64×64 até 128×4×4; depois `Flatten → Dropout → Linear → ReLU → Dropout → Linear` para logits.  
-- **Augmentação:** rotações, *affine* (translate/scale/shear), flips H/V, `ColorJitter`, ruído gaussiano, *RandomErasing*; tudo seguido de `Normalize([0.5], [0.5])`.  
-- **Treino:** Adam (LR = 1e-3) + `StepLR` (γ = 0.1 a cada 3 épocas), `CrossEntropyLoss`, 10 épocas padrão, *checkpoint* em `checkpoint.pth`.  
-- **Avaliação:** acurácia em *test set* + matriz de confusão normalizada (salva em `apresentacao/confusion_matrix.png`).  
-- **Extras:** *forward hook* salva *feature maps* do último bloco conv; script imprime média/σ do dataset e, opcionalmente, das capturas de webcam para análise de domínio.
+**Post-processing**
+- Resize to 64 × 64
+- Normalize (mean = 0.5, std = 0.5)
+- Convert to tensor (ToTensorV2)
 
+---
+
+## Quick project overview
+- **Goal:** classify 64 × 64 images as *woman* or *man* using a lightweight CNN (~2M parameters).  
+- **Architecture (`SimpleCNN`):** 4 blocks `Conv → BN → ReLU → MaxPool`, from 3×64×64 to 128×4×4; then `Flatten → Dropout → Linear → ReLU → Dropout → Linear` to logits.  
+- **Augmentation:** rotations, affine (translate/scale/shear), H/V flips, `ColorJitter`, Gaussian noise, `RandomErasing`; all followed by `Normalize([0.5], [0.5])`.  
+- **Training:** Adam (LR = 1e-3) + `StepLR` (γ = 0.1 every 3 epochs), `CrossEntropyLoss`, 10 default epochs, checkpoint saved to `checkpoint.pth`.  
+- **Evaluation:** accuracy on *test set* + normalized confusion matrix (saved to `apresentacao/confusion_matrix.png`).  
+- **Extras:** *forward hook* saves feature maps from the last conv block; script prints mean/σ of the dataset and optionally of webcam captures for domain analysis.
 
 ## Stack:
-- **PyTorch / TorchVision** – backbone de deep learning: define a CNN (nn.Module), executa o treinamento/inferência no CPU ou GPU e fornece utilitários de transformação base (transforms).
-- **Albumentations (+ ToTensorV2)** – motor de data-augmentation avançado; aplica rotações, affine, ruído, blur, etc., devolvendo tensores diretamente compatíveis com PyTorch.
-- **OpenCV** – captura de vídeo em tempo real, aplicação de digital zoom e overlay de resultados na janela da webcam.
-- **Pillow (PIL)** – leitura de bytes de imagem → objetos RGB manipuláveis.
-- **NumPy** – operações numéricas rápidas (ex.: conversão de imagens para arrays, cálculo de médias/desvios).
-- **Pandas** – leitura dos splits Parquet hospedados no Hugging Face Hub e manipulação tabular dos metadados.
-- **Matplotlib** – geração de gráficos: curvas de perda/acurácia, matriz de confusão e visualização de feature maps.
-- **tqdm** – barras de progresso elegantes durante o treinamento.
-- **Albumentations + Hugging Face hub links** – combinados para carregar dados e aplicar o pipeline de preprocessamento em tempo real.
+- **PyTorch / TorchVision** – deep learning backbone: defines the CNN (`nn.Module`), runs training/inference on CPU or GPU, and provides base transform utilities.
+- **Albumentations (+ ToTensorV2)** – advanced data augmentation engine; applies rotation, affine, noise, blur, etc., and returns PyTorch-compatible tensors.
+- **OpenCV** – real-time video capture, digital zoom, and overlay of results in the
